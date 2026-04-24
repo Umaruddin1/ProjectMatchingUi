@@ -1,0 +1,2 @@
+0000000000000000000000000000000000000000 c407e774662c1c37c9b68a4e224cb3d27d95858b umaruddin1 <umaruddin958@gmail.com> 1777042038 +0530	commit (initial): Initial UI implementation with API bindings
+c407e774662c1c37c9b68a4e224cb3d27d95858b 4e06013b1d29640cf8f5aa7b0b6c4cc1815bab34 umaruddin1 <umaruddin958@gmail.com> 1777043462 +0530	commit: Fix API response type mismatches and field name mappings

@@ -1,0 +1,11 @@
+Fix API response type mismatches and field name mappings
+
+- Updated ProcessResponse, ReconcileResponse, ExportRequest types to match actual backend responses
+- Backend returns flat response structure, not wrapped in 'data' field
+- Fixed field names: 'unmatched_current' → 'unmatched_current_rows', 'final_matches' → 'reconciled_matches'
+- Updated all page components to use correct field names from API responses
+- Updated WorkflowContext types to match actual API response structures
+- Removed duplicate exports error by recreating api.ts cleanly
+- UploadPage, CorrectionsPage, ResultsPage all now correctly map to backend API
+
+Co-authored-by: Copilot <223556219+Copilot@users.noreply.github.com>
