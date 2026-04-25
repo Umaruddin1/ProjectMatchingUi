@@ -6,6 +6,7 @@ export interface ProcessResponse {
   previous_year_rows: Row[];
   exact_matches: Match[];
   suggested_matches: Match[];
+  ambiguous_matches?: any[];
   unmatched_current_rows: Row[];
   unmatched_previous_rows: Row[];
   validation_issues: ValidationIssue[];
@@ -31,14 +32,19 @@ export interface Row {
 }
 
 export interface Match {
-  current_row_number: number;
-  previous_row_number: number;
+  current_row_number?: number;
+  previous_row_number?: number;
   project_name: string;
   current_values: Record<string, any>;
   previous_values: Record<string, any>;
   wip_impact?: number;
   far_impact?: number;
   fuzzy_match_score?: number;
+  match_status?: string;
+  requires_review?: boolean;
+  match_type?: string;
+  current_project?: string;
+  previous_project?: string;
 }
 
 export interface ValidationIssue {
@@ -67,6 +73,7 @@ export interface ReconcileRequest {
   approved_matches: ApprovedMatch[];
   current_year_rows: Row[];
   previous_year_rows: Row[];
+  include_unmatched_rows?: boolean;
 }
 
 export interface ReconcileResponse {
@@ -78,6 +85,8 @@ export interface ReconcileResponse {
   total_previous_rows: number;
   total_matched: number;
   total_unmatched: number;
+  total_unmatched_current?: number;
+  total_unmatched_previous?: number;
   total_wip_impact: number;
   total_far_impact: number;
   error?: string;

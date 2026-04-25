@@ -20,6 +20,9 @@ export default function CorrectionsPage() {
   const [isSubmitting, setIsSubmitting] = useState(false);
   const [error, setError] = useState<string | null>(null);
   const [manualSelections, setManualSelections] = useState<Record<number, string>>({});
+  const [fuzzySelections, setFuzzySelections] = useState<Record<number, string>>({});
+  const [showContinueModal, setShowContinueModal] = useState(false);
+  const [isContinuingCalculation, setIsContinuingCalculation] = useState(false);
 
   const getSuggestedMatchPercent = (match: any) => {
     const rawScore = match?.fuzzy_match_score ?? match?.confidence ?? 0;
@@ -48,9 +51,18 @@ export default function CorrectionsPage() {
     if (approvedMatches.length === 0) {
       setApprovedMatches((processData.exact_matches || []).map(normalizeApprovedMatch));
     }
+    if (Object.keys(fuzzySelections).length === 0) {
+      const initialFuzzySelections: Record<number, string> = {};
+      (processData.suggested_matches || []).forEach((match: any) => {
+        if (match.current_row_number && match.suggested_previous_row_number) {
+          initialFuzzySelections[match.current_row_number] = String(match.suggested_previous_row_number);
+        }
+      });
+      setFuzzySelections(initialFuzzySelections);
+    }
     setManualSelections({});
     setError(null);
-  }, [processData, approvedMatches.length, setApprovedMatches]);
+  }, [processData, approvedMatches.length, setApprovedMatches, fuzzySelections]);
 
   if (!processData) {
     return (
@@ -79,14 +91,43 @@ export default function CorrectionsPage() {
 
   const remainingCurrentRows = currentYearRows.filter((row: any) => !approvedCurrentRowNumbers.has(row.row_number));
   const remainingPreviousRows = previousYearRows.filter((row: any) => !approvedPreviousRowNumbers.has(row.row_number));
-  const allCurrentRowsMatched = remainingCurrentRows.length === 0;
+  const remainingUnmappedCount = remainingCurrentRows.length + remainingPreviousRows.length;
 
   const handleApproveAllFuzzy = () => {
     const nextMatches = [...approvedMatches];
 
     (processData.suggested_matches || []).forEach((match: any) => {
       if (!nextMatches.some((existing: any) => existing.current_row_number === match.current_row_number)) {
-        nextMatches.push(normalizeApprovedMatch(match));
+        const selectedPreviousRowNumber = Number(
+          fuzzySelections[match.current_row_number] || match.suggested_previous_row_number
+        );
+        const previousRow = previousYearRows.find(
+          (row: any) => row.row_number === selectedPreviousRowNumber
+        );
+
+        if (!previousRow) {
+          return;
+        }
+
+        const alreadyUsed = nextMatches.some((existing: any) => {
+          const prev = existing.previous_row_number ?? existing.suggested_previous_row_number;
+          return prev === selectedPreviousRowNumber;
+        });
+
+        if (alreadyUsed) {
+          return;
+        }
+
+        nextMatches.push(
+          normalizeApprovedMatch({
+            ...match,
+            previous_row_number: selectedPreviousRowNumber,
+            suggested_previous_row_number: selectedPreviousRowNumber,
+            previous_project_name: previousRow.project_name,
+            suggested_project_name: previousRow.project_name,
+            previous_values: previousRow.values,
+          })
+        );
       }
     });
 
@@ -139,13 +180,45 @@ export default function CorrectionsPage() {
     setError(null);
   };
 
-  const handleSubmit = async () => {
-    if (!allCurrentRowsMatched) {
-      setError("Please match all current year projects before proceeding");
+  const handleApproveFuzzy = (match: any) => {
+    const selectedPreviousRowNumber = Number(
+      fuzzySelections[match.current_row_number] || match.suggested_previous_row_number
+    );
+
+    if (!selectedPreviousRowNumber) {
+      setError("Please choose a previous year project before approving this fuzzy match");
       return;
     }
 
+    if (approvedPreviousRowNumbers.has(selectedPreviousRowNumber)) {
+      setError("This previous year project is already matched");
+      return;
+    }
+
+    const previousRow = previousYearRows.find((row: any) => row.row_number === selectedPreviousRowNumber);
+    if (!previousRow) {
+      setError("Selected previous year project could not be found");
+      return;
+    }
+
+    setApprovedMatches([
+      ...approvedMatches,
+      normalizeApprovedMatch({
+        ...match,
+        previous_row_number: selectedPreviousRowNumber,
+        suggested_previous_row_number: selectedPreviousRowNumber,
+        previous_project_name: previousRow.project_name,
+        suggested_project_name: previousRow.project_name,
+        previous_values: previousRow.values,
+      }),
+    ]);
+    setError(null);
+  };
+
+  const continueWithApprovedOnly = async () => {
+    setShowContinueModal(false);
     setIsSubmitting(true);
+    setIsContinuingCalculation(true);
     setError(null);
     setIsReconciling(true);
 
@@ -154,6 +227,7 @@ export default function CorrectionsPage() {
         approved_matches: approvedMatches,
         current_year_rows: processData.current_year_rows,
         previous_year_rows: processData.previous_year_rows,
+        include_unmatched_rows: false,
       });
 
       if (result.success) {
@@ -171,7 +245,17 @@ export default function CorrectionsPage() {
     } finally {
       setIsSubmitting(false);
       setIsReconciling(false);
+      setIsContinuingCalculation(false);
     }
+  };
+
+  const handleSubmit = async () => {
+    if (remainingUnmappedCount > 0) {
+      setShowContinueModal(true);
+      return;
+    }
+
+    await continueWithApprovedOnly();
   };
 
   const formatNumber = (val: any) => {
@@ -213,8 +297,10 @@ export default function CorrectionsPage() {
                 {approvedMatches.length} / {currentYearRows.length} current year rows matched
               </p>
             </div>
-            <div className={`text-sm font-medium ${allCurrentRowsMatched ? "text-success" : "text-accent"}`}>
-              {allCurrentRowsMatched ? "Ready to proceed" : `${remainingCurrentRows.length} current rows still need manual matching`}
+            <div className={`text-sm font-medium ${remainingUnmappedCount === 0 ? "text-success" : "text-accent"}`}>
+              {remainingUnmappedCount === 0
+                ? "Ready to proceed"
+                : `${remainingCurrentRows.length} current and ${remainingPreviousRows.length} previous rows still unmapped`}
             </div>
           </div>
         </div>
@@ -321,6 +407,39 @@ export default function CorrectionsPage() {
                             Suggested project: {match.suggested_project_name || match.previous_project_name}
                           </p>
                         )}
+                        <div className="mt-3 max-w-md">
+                          <label className="block text-xs font-medium text-muted-foreground mb-2">
+                            Update fuzzy mapping target
+                          </label>
+                          <select
+                            value={
+                              fuzzySelections[match.current_row_number]
+                              || String(match.suggested_previous_row_number || "")
+                            }
+                            onChange={(e) =>
+                              setFuzzySelections((prev) => ({
+                                ...prev,
+                                [match.current_row_number]: e.target.value,
+                              }))
+                            }
+                            className="w-full rounded-md border border-border bg-background px-3 py-2 text-sm text-foreground"
+                          >
+                            <option value="">Choose previous year project</option>
+                            {previousYearRows
+                              .filter((row: any) => {
+                                const selectedValue = Number(
+                                  fuzzySelections[match.current_row_number]
+                                  || match.suggested_previous_row_number
+                                );
+                                return !approvedPreviousRowNumbers.has(row.row_number) || row.row_number === selectedValue;
+                              })
+                              .map((row: any) => (
+                                <option key={row.row_number} value={row.row_number}>
+                                  {row.project_name} (Row {row.row_number})
+                                </option>
+                              ))}
+                          </select>
+                        </div>
                         <div className="grid grid-cols-2 gap-4 mt-2 text-xs">
                           <div className="bg-muted p-2 rounded">
                             <p className="text-muted-foreground">
@@ -333,7 +452,7 @@ export default function CorrectionsPage() {
                         </div>
                       </div>
                       <Button
-                        onClick={() => setApprovedMatches([...approvedMatches, normalizeApprovedMatch(match)])}
+                        onClick={() => handleApproveFuzzy(match)}
                         size="sm"
                         variant="outline"
                         className="ml-4"
@@ -410,19 +529,41 @@ export default function CorrectionsPage() {
           <Button onClick={() => navigate("/preview")} variant="outline">
             Back
           </Button>
-          <Button onClick={handleSubmit} disabled={!allCurrentRowsMatched || isSubmitting} size="lg">
+          <Button onClick={handleSubmit} disabled={isSubmitting} size="lg">
             {isSubmitting ? (
               <>
                 <span className="animate-spin">⚙️</span> Reconciling...
               </>
             ) : (
               <>
-                Proceed to Results
+                Proceed
                 <ArrowRight className="w-4 h-4 ml-2" />
               </>
             )}
           </Button>
         </div>
+
+        {showContinueModal && (
+          <div className="fixed inset-0 z-50 flex items-center justify-center bg-black/50 px-4">
+            <div className="w-full max-w-md rounded-lg border border-border bg-background p-6 shadow-xl">
+              <h3 className="mb-2 text-lg font-semibold text-foreground">Unmapped rows remain</h3>
+              <p className="mb-4 text-sm text-muted-foreground">
+                You still have {remainingUnmappedCount} unmapped rows ({remainingCurrentRows.length} current year and {remainingPreviousRows.length} previous year).
+              </p>
+              <p className="mb-6 text-sm text-muted-foreground">
+                Continue mapping them, or calculate now using only the approved matches.
+              </p>
+              <div className="flex flex-col gap-3 sm:flex-row sm:justify-end">
+                <Button variant="outline" onClick={() => setShowContinueModal(false)}>
+                  Continue Mapping
+                </Button>
+                <Button onClick={continueWithApprovedOnly} disabled={isContinuingCalculation}>
+                  {isContinuingCalculation ? "Calculating..." : "Continue Calculation"}
+                </Button>
+              </div>
+            </div>
+          </div>
+        )}
       </div>
     </Layout>
   );

@@ -205,6 +205,7 @@ export default function ResultsPage() {
                     <th className="px-6 py-3 text-left font-medium">Project</th>
                     <th className="px-6 py-3 text-right font-medium">Current</th>
                     <th className="px-6 py-3 text-right font-medium">Previous</th>
+                    <th className="px-6 py-3 text-right font-medium">Status</th>
                     <th className="px-6 py-3 text-right font-medium">WIP Impact</th>
                     <th className="px-6 py-3 text-right font-medium">FAR Impact</th>
                   </tr>
@@ -212,9 +213,24 @@ export default function ResultsPage() {
                 <tbody>
                   {reconcileData.reconciled_matches?.slice(0, 20).map((match: any, idx: number) => (
                     <tr key={idx} className="border-t border-border hover:bg-muted/50">
-                      <td className="px-6 py-3 font-medium">{match.project_name}</td>
-                      <td className="px-6 py-3 text-right">{match.current_row_number}</td>
-                      <td className="px-6 py-3 text-right">{match.previous_row_number || "-"}</td>
+                      <td className="px-6 py-3 font-medium">{match.project_name || match.current_project || match.previous_project || "-"}</td>
+                      <td className="px-6 py-3 text-right">{match.current_row_number ?? "-"}</td>
+                      <td className="px-6 py-3 text-right">{match.previous_row_number ?? "-"}</td>
+                      <td className="px-6 py-3 text-right">
+                        <span
+                          className={`px-2 py-1 rounded text-xs font-medium ${
+                            match.match_status === "unmatched_current" || match.match_status === "unmatched_previous"
+                              ? "bg-accent/20 text-accent"
+                              : "bg-success/20 text-success"
+                          }`}
+                        >
+                          {match.match_status === "unmatched_current"
+                            ? "Unmatched current"
+                            : match.match_status === "unmatched_previous"
+                              ? "Unmatched previous"
+                              : match.match_type || "Matched"}
+                        </span>
+                      </td>
                       <td className={`px-6 py-3 text-right font-medium ${(match.wip_impact || 0) >= 0 ? 'text-success' : 'text-destructive'}`}>
                         {formatNumber(match.wip_impact)}
                       </td>
