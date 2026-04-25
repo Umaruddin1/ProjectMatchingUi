@@ -2,10 +2,13 @@ import { useState } from "react";
 import { useNavigate } from "react-router";
 import Layout from "@/react-app/components/layout/Layout";
 import { Button } from "@/react-app/components/ui/button";
-import { Upload, FileSpreadsheet, CheckCircle2, AlertCircle, ArrowRight, X } from "lucide-react";
+import { Upload, FileSpreadsheet, CheckCircle2, AlertCircle, ArrowRight, X, Download } from "lucide-react";
 import { cn } from "@/react-app/lib/utils";
 import { useWorkflow } from "@/react-app/lib/workflowContext";
 import { processFiles } from "@/react-app/lib/api";
+
+const CURRENT_YEAR_HEADERS = ["Project Name", "Additions", "Transfer", "Closing Balance"];
+const PRE_YEAR_HEADERS = ["Project Name", "Opening Balance", "Additions", "Transfer", "Closing Balance"];
 
 export default function UploadPage() {
   const navigate = useNavigate();
@@ -92,6 +95,25 @@ export default function UploadPage() {
     return (bytes / (1024 * 1024)).toFixed(1) + " MB";
   };
 
+  const downloadSampleCsv = (type: "current" | "pre") => {
+    const headers = type === "current" ? CURRENT_YEAR_HEADERS : PRE_YEAR_HEADERS;
+    const sampleRow =
+      type === "current"
+        ? ["Project A", "120000", "-5000", "115000"]
+        : ["Project A", "100000", "120000", "-5000", "115000"];
+
+    const csv = `${headers.join(",")}\n${sampleRow.join(",")}`;
+    const blob = new Blob([csv], { type: "text/csv;charset=utf-8;" });
+    const url = URL.createObjectURL(blob);
+    const link = document.createElement("a");
+    link.href = url;
+    link.download = type === "current" ? "current-year-31-dec-sample.csv" : "pre-year-31-mar-sample.csv";
+    document.body.appendChild(link);
+    link.click();
+    document.body.removeChild(link);
+    URL.revokeObjectURL(url);
+  };
+
   const handleAnalyze = async () => {
     if (!currentFile || !previousFile) {
       setUploadError("Please upload both current and previous year files");
@@ -131,14 +153,83 @@ export default function UploadPage() {
         <div className="mb-8">
           <h2 className="text-2xl font-semibold text-foreground mb-2">Upload Excel Files</h2>
           <p className="text-muted-foreground">
-            Upload two Excel files: one for current year (31 Mar) and one for previous year (31 Dec)
+            Upload two Excel files: one for current year (31 Dec) and one for pre year (31 Mar)
           </p>
+
+          <div className="mt-4 rounded-lg border border-border bg-card p-4">
+            <div className="flex flex-col gap-2 md:flex-row md:items-center md:justify-between mb-3">
+              <h3 className="text-sm font-semibold text-foreground">Sample / Preview of Sheet Headers</h3>
+              <p className="text-xs text-muted-foreground">
+                Download these samples to match API-required headers.
+              </p>
+            </div>
+
+            <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
+              <div className="rounded-md border border-border p-3">
+                <div className="flex items-center justify-between mb-2">
+                  <p className="text-sm font-medium text-foreground">Current Year (31 Dec)</p>
+                  <Button
+                    type="button"
+                    variant="outline"
+                    size="sm"
+                    onClick={() => downloadSampleCsv("current")}
+                    className="h-8"
+                  >
+                    <Download className="w-4 h-4 mr-2" />
+                    Download Sample
+                  </Button>
+                </div>
+                <div className="overflow-x-auto">
+                  <table className="w-full text-xs">
+                    <thead>
+                      <tr className="text-left text-muted-foreground border-b border-border">
+                        {CURRENT_YEAR_HEADERS.map((header) => (
+                          <th key={header} className="py-2 pr-3 font-medium whitespace-nowrap">
+                            {header}
+                          </th>
+                        ))}
+                      </tr>
+                    </thead>
+                  </table>
+                </div>
+              </div>
+
+              <div className="rounded-md border border-border p-3">
+                <div className="flex items-center justify-between mb-2">
+                  <p className="text-sm font-medium text-foreground">Pre Year (31 Mar)</p>
+                  <Button
+                    type="button"
+                    variant="outline"
+                    size="sm"
+                    onClick={() => downloadSampleCsv("pre")}
+                    className="h-8"
+                  >
+                    <Download className="w-4 h-4 mr-2" />
+                    Download Sample
+                  </Button>
+                </div>
+                <div className="overflow-x-auto">
+                  <table className="w-full text-xs">
+                    <thead>
+                      <tr className="text-left text-muted-foreground border-b border-border">
+                        {PRE_YEAR_HEADERS.map((header) => (
+                          <th key={header} className="py-2 pr-3 font-medium whitespace-nowrap">
+                            {header}
+                          </th>
+                        ))}
+                      </tr>
+                    </thead>
+                  </table>
+                </div>
+              </div>
+            </div>
+          </div>
         </div>
 
         <div className="grid grid-cols-1 md:grid-cols-2 gap-6 mb-6">
           {/* Current Year */}
           <div>
-            <label className="block text-sm font-medium text-foreground mb-3">Current Year (31 Mar)</label>
+            <label className="block text-sm font-medium text-foreground mb-3">Current Year (31 Dec)</label>
             {!currentFile ? (
               <div
                 id="current"
@@ -194,9 +285,9 @@ export default function UploadPage() {
             )}
           </div>
 
-          {/* Previous Year */}
+          {/* Pre Year */}
           <div>
-            <label className="block text-sm font-medium text-foreground mb-3">Previous Year (31 Dec)</label>
+            <label className="block text-sm font-medium text-foreground mb-3">Pre Year (31 Mar)</label>
             {!previousFile ? (
               <div
                 id="previous"

@@ -43,9 +43,13 @@ export interface Match {
 
 export interface ValidationIssue {
   row_number: number;
-  sheet: string;
+  sheet?: string;
+  file_type?: "current_year" | "previous_year";
+  file_name?: string;
+  source_label?: string;
   project_name: string;
-  issue: string;
+  issue?: string;
+  description?: string;
   values?: Record<string, any>;
 }
 

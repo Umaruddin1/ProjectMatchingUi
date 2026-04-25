@@ -7,7 +7,7 @@ import { AlertCircle, ChevronDown, ChevronUp, ArrowRight } from "lucide-react";
 
 export default function DataPreviewPage() {
   const navigate = useNavigate();
-  const { processData, processError } = useWorkflow();
+  const { processData, processError, currentFile, previousFile } = useWorkflow();
   const [expandedSections, setExpandedSections] = useState({
     current: true,
     previous: true,
@@ -45,6 +45,28 @@ export default function DataPreviewPage() {
     if (val === null || val === undefined) return "-";
     if (typeof val === "number") return val.toLocaleString("en-US", { maximumFractionDigits: 2 });
     return val;
+  };
+
+  const getSuggestedMatchPercent = (match: any) => {
+    const rawScore = match?.confidence ?? match?.fuzzy_match_score ?? 0;
+    if (typeof rawScore !== "number" || Number.isNaN(rawScore)) return 0;
+    return rawScore <= 1 ? rawScore * 100 : rawScore;
+  };
+
+  const getValidationIssueFileName = (issue: any) => {
+    if (issue?.file_name) return issue.file_name;
+    const source = String(issue?.file_type || issue?.sheet || "").toLowerCase();
+    if (source.includes("current")) return currentFile?.name || "Current Year File";
+    if (source.includes("previous") || source.includes("pre")) return previousFile?.name || "Pre Year File";
+    return "Uploaded File";
+  };
+
+  const getValidationIssueSourceLabel = (issue: any) => {
+    if (issue?.source_label) return issue.source_label;
+    const source = String(issue?.file_type || issue?.sheet || "").toLowerCase();
+    if (source.includes("current")) return "Current Year Sheet";
+    if (source.includes("previous") || source.includes("pre")) return "Previous Year Sheet";
+    return "Uploaded Sheet";
   };
 
   return (
@@ -265,10 +287,17 @@ export default function DataPreviewPage() {
                   <div className="space-y-2">
                     {processData.suggested_matches?.slice(0, 5).map((match: any, idx: number) => (
                       <div key={idx} className="text-sm bg-muted p-3 rounded">
-                        <p className="text-foreground font-medium">{match.project_name}</p>
-                        <p className="text-xs text-muted-foreground">
-                          Row {match.current_row_number} ↔ {match.previous_row_number} ({(match.fuzzy_match_score || 0).toFixed(1)}% match)
+                        <p className="text-foreground font-medium">
+                          {match.current_project_name || match.project_name || "-"}
                         </p>
+                        <p className="text-xs text-muted-foreground">
+                          Row {match.current_row_number} ↔ {match.suggested_previous_row_number || match.previous_row_number || "-"} ({getSuggestedMatchPercent(match).toFixed(1)}% match)
+                        </p>
+                        {(match.suggested_project_name || match.previous_project_name) && (
+                          <p className="text-xs text-muted-foreground">
+                            Suggested: {match.suggested_project_name || match.previous_project_name}
+                          </p>
+                        )}
                       </div>
                     ))}
                   </div>
@@ -304,8 +333,10 @@ export default function DataPreviewPage() {
                 {processData.validation_issues?.map((issue: any, idx: number) => (
                   <div key={idx} className="px-6 py-3 text-sm bg-destructive/5">
                     <p className="font-medium text-foreground">{issue.project_name}</p>
-                    <p className="text-xs text-muted-foreground">{issue.sheet} - Row {issue.row_number}</p>
-                    <p className="text-sm text-destructive">{issue.issue}</p>
+                    <p className="text-xs text-muted-foreground">
+                      Source: {getValidationIssueSourceLabel(issue)} | File: {getValidationIssueFileName(issue)} | Row {issue.row_number}
+                    </p>
+                    <p className="text-sm text-destructive">{issue.issue || issue.description}</p>
                   </div>
                 ))}
               </div>
