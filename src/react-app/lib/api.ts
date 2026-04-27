@@ -1,13 +1,5 @@
-const API_MODE = (import.meta.env.VITE_API_MODE || "local").toLowerCase();
-const LOCAL_API_URL = import.meta.env.VITE_API_URL_LOCAL || "http://localhost:8000";
-const SERVER_API_URL =
-  import.meta.env.VITE_API_URL_SERVER || "https://project-matching-service.vercel.app";
 const API_BASE_URL =
-  API_MODE === "server"
-    ? SERVER_API_URL
-    : API_MODE === "local"
-      ? LOCAL_API_URL
-      : import.meta.env.VITE_API_URL || LOCAL_API_URL;
+  import.meta.env.VITE_API_URL_SERVER || "https://project-matching-service.vercel.app";
 const AUTH_TOKEN_KEY = "syncwave_auth_token";
 
 export interface LoginRequest {
