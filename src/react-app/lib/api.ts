@@ -1,4 +1,16 @@
 const API_BASE_URL = import.meta.env.VITE_API_URL || "http://localhost:8000";
+const AUTH_TOKEN_KEY = "syncwave_auth_token";
+
+export interface LoginRequest {
+  username: string;
+  password: string;
+}
+
+export interface LoginResponse {
+  access_token: string;
+  token_type: string;
+  expires_in: number;
+}
 
 export interface ProcessResponse {
   success: boolean;
@@ -101,6 +113,52 @@ export interface ExportRequest {
   summary: Record<string, any>;
 }
 
+function getAuthHeaders(): HeadersInit {
+  const token = localStorage.getItem(AUTH_TOKEN_KEY);
+  if (!token) {
+    throw new Error("Authentication required. Please log in.");
+  }
+  return {
+    Authorization: `Bearer ${token}`,
+  };
+}
+
+async function parseApiError(response: Response, fallback: string): Promise<string> {
+  try {
+    const errorData = await response.json();
+    return errorData.detail || fallback;
+  } catch {
+    return fallback;
+  }
+}
+
+export async function login(payload: LoginRequest): Promise<LoginResponse> {
+  const response = await fetch(`${API_BASE_URL}/api/v1/auth/login`, {
+    method: "POST",
+    headers: {
+      "Content-Type": "application/json",
+    },
+    body: JSON.stringify(payload),
+  });
+
+  if (!response.ok) {
+    const message = await parseApiError(response, `Login failed: ${response.statusText}`);
+    throw new Error(message);
+  }
+
+  const data: LoginResponse = await response.json();
+  localStorage.setItem(AUTH_TOKEN_KEY, data.access_token);
+  return data;
+}
+
+export function logout() {
+  localStorage.removeItem(AUTH_TOKEN_KEY);
+}
+
+export function isAuthenticated(): boolean {
+  return Boolean(localStorage.getItem(AUTH_TOKEN_KEY));
+}
+
 // Process: Upload and parse two files
 export async function processFiles(
   currentFile: File,
@@ -112,12 +170,15 @@ export async function processFiles(
 
   const response = await fetch(`${API_BASE_URL}/api/v1/process`, {
     method: "POST",
+    headers: {
+      ...getAuthHeaders(),
+    },
     body: formData,
   });
 
   if (!response.ok) {
-    const errorData = await response.json();
-    throw new Error(errorData.detail || `Upload failed: ${response.statusText}`);
+    const message = await parseApiError(response, `Upload failed: ${response.statusText}`);
+    throw new Error(message);
   }
 
   return response.json();
@@ -131,13 +192,14 @@ export async function reconcileMatches(
     method: "POST",
     headers: {
       "Content-Type": "application/json",
+      ...getAuthHeaders(),
     },
     body: JSON.stringify(request),
   });
 
   if (!response.ok) {
-    const errorData = await response.json();
-    throw new Error(errorData.detail || `Reconciliation failed: ${response.statusText}`);
+    const message = await parseApiError(response, `Reconciliation failed: ${response.statusText}`);
+    throw new Error(message);
   }
 
   return response.json();
@@ -151,13 +213,14 @@ export async function exportToExcel(
     method: "POST",
     headers: {
       "Content-Type": "application/json",
+      ...getAuthHeaders(),
     },
     body: JSON.stringify(reconciliationData),
   });
 
   if (!response.ok) {
-    const errorData = await response.json();
-    throw new Error(errorData.detail || `Export failed: ${response.statusText}`);
+    const message = await parseApiError(response, `Export failed: ${response.statusText}`);
+    throw new Error(message);
   }
 
   return response.blob();
