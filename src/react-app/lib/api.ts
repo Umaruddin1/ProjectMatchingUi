@@ -114,10 +114,57 @@ export interface ExportRequest {
   summary: Record<string, any>;
 }
 
-function getAuthHeaders(): HeadersInit {
+function base64UrlDecode(value: string): string {
+  const base64 = value.replace(/-/g, "+").replace(/_/g, "/");
+  const padded = base64.padEnd(base64.length + ((4 - (base64.length % 4)) % 4), "=");
+  return atob(padded);
+}
+
+function getTokenExpiration(token: string): number | null {
+  try {
+    const payloadPart = token.split(".")[1];
+    if (!payloadPart) {
+      return null;
+    }
+
+    const payload = JSON.parse(base64UrlDecode(payloadPart)) as { exp?: number };
+    return typeof payload.exp === "number" ? payload.exp * 1000 : null;
+  } catch {
+    return null;
+  }
+}
+
+export function isTokenExpired(token: string | null): boolean {
+  if (!token) {
+    return true;
+  }
+
+  const expiresAt = getTokenExpiration(token);
+  if (!expiresAt) {
+    return true;
+  }
+
+  return Date.now() >= expiresAt;
+}
+
+function getStoredToken(): string | null {
   const token = localStorage.getItem(AUTH_TOKEN_KEY);
   if (!token) {
-    throw new Error("Authentication required. Please log in.");
+    return null;
+  }
+
+  if (isTokenExpired(token)) {
+    localStorage.removeItem(AUTH_TOKEN_KEY);
+    return null;
+  }
+
+  return token;
+}
+
+function getAuthHeaders(): HeadersInit {
+  const token = getStoredToken();
+  if (!token) {
+    throw new Error("Session expired. Please log in again.");
   }
   return {
     Authorization: `Bearer ${token}`,
@@ -157,7 +204,7 @@ export function logout() {
 }
 
 export function isAuthenticated(): boolean {
-  return Boolean(localStorage.getItem(AUTH_TOKEN_KEY));
+  return Boolean(getStoredToken());
 }
 
 // Process: Upload and parse two files
