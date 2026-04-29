@@ -86,6 +86,11 @@ export default function ResultsPage() {
   const totalWipImpact = reconcileData.total_wip_impact || 0;
   const totalFarImpact = reconcileData.total_far_impact || 0;
 
+  // Compute unmatched counts: prefer included rows length, fall back to totals returned by API when arrays are empty
+  const unmatchedCurrentCount = (reconcileData.unmatched_current_rows?.length || 0) || (reconcileData.total_unmatched_current ?? reconcileData.total_unmatched ?? 0);
+  const unmatchedPreviousCount = (reconcileData.unmatched_previous_rows?.length || 0) || (reconcileData.total_unmatched_previous ?? reconcileData.total_unmatched ?? 0);
+  const unmatchedTotalCount = unmatchedCurrentCount + unmatchedPreviousCount;
+
   return (
     <Layout fileName="reconciliation_result.xlsx">
       <div className="max-w-6xl mx-auto">
@@ -138,7 +143,7 @@ export default function ResultsPage() {
               Unmatched
             </p>
             <p className="text-2xl font-semibold text-foreground">
-              {(reconcileData.unmatched_current_rows?.length || 0) + (reconcileData.unmatched_previous_rows?.length || 0)}
+              {unmatchedTotalCount}
             </p>
           </div>
         </div>
@@ -168,13 +173,13 @@ export default function ResultsPage() {
                 <div>
                   <p className="text-sm text-muted-foreground mb-2">Unmatched Current</p>
                   <p className="text-3xl font-bold text-accent">
-                    {reconcileData.unmatched_current_rows?.length || 0}
+                    {unmatchedCurrentCount}
                   </p>
                 </div>
                 <div>
                   <p className="text-sm text-muted-foreground mb-2">Unmatched Previous</p>
                   <p className="text-3xl font-bold text-accent">
-                    {reconcileData.unmatched_previous_rows?.length || 0}
+                    {unmatchedPreviousCount}
                   </p>
                 </div>
               </div>
