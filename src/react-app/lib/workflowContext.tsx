@@ -27,6 +27,9 @@ interface ReconcileData {
   total_current_rows: number;
   total_previous_rows: number;
   total_matched: number;
+  // Optional per-type unmatched counts (populated by API in some responses)
+  total_unmatched_current?: number;
+  total_unmatched_previous?: number;
   total_unmatched: number;
   total_wip_impact: number;
   total_far_impact: number;
